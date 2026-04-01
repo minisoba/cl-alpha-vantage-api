@@ -16,13 +16,19 @@
         for name = (closer-mop:slot-definition-name slot)
         collect (cons name (slot-value obj name))))
 
+(defun %slot-to-column-name (slot-name)
+  "Convert a Lisp SLOT-NAME symbol to a quoted DuckDB column name.
+   Example: 52-WEEK-HIGH -> \"52_week_high\"."
+  (format nil "\"~a\""
+          (substitute #\_ #\- (string-downcase (symbol-name slot-name)))))
+
 (defun %make-create-table-sql (table-name obj)
   "Generate a CREATE TABLE SQL statement from OBJ's slot definitions."
   (format nil "CREATE TABLE ~a (~{~a~^, ~})"
           table-name
           (loop for (name . sql-type) in (%slot-definitions obj)
                 collect (format nil "~a ~a"
-                                (substitute #\_ #\- (string-downcase (symbol-name name)))
+                                (%slot-to-column-name name)
                                 sql-type))))
 
 (defun %sql-escape (value)

@@ -155,6 +155,10 @@
     ((natural-gas
       :time-series)
      . ((interval :optional :interval-2-types)))
+    ((gold-silver-history
+      :time-series)
+     . ((symbol   :required :string)
+        (interval :optional :interval-2-types)))
     ((copper
       :time-series)
      . ((interval :optional :interval-3-types)))

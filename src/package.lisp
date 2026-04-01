@@ -295,6 +295,7 @@
    #:wti
    #:brent
    #:natural-gas
+   #:gold-silver-history
    #:copper
    #:aluminum
    #:wheat

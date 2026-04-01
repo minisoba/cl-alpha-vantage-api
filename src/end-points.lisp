@@ -39,6 +39,7 @@
 (defendpoint wti)
 (defendpoint brent)
 (defendpoint natural-gas)
+(defendpoint gold-silver-history)
 (defendpoint copper)
 (defendpoint aluminum)
 (defendpoint wheat)

@@ -22,6 +22,7 @@
   (let (series)
     (dolist (row (gethash "data" hash-table) (nreverse series))
       (%rename-hash-key "date" "timestamp" row)
+      (%rename-hash-key "price" "value" row)
       (push (make-time-series row) series))))
 
 (defun %process-time-series-ohcl (hash-table query &optional (key "Time Series") (fn #'make-time-series-ohcl))
@@ -201,8 +202,11 @@
 (defun %get-data (query)
   "Send an HTTP request for QUERY and process the response into domain objects."
   (alexandria:when-let (data (http-request query))
-    (let ((err-msg (gethash "Error Message" data)))
+    (let ((err-msg (gethash "Error Message" data))
+          (info-msg (gethash "Information" data)))
       (cond (err-msg
              (error 'invalid-api-call :argument err-msg))
+            (info-msg
+             (error 'invalid-api-call :argument info-msg))
             (t
              (%process-data data query))))))
