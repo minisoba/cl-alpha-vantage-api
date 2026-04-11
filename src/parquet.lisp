@@ -8,6 +8,9 @@
         collect (cons name
                       (cond ((eql initform 0)   "BIGINT")
                             ((eql initform 0.0) "DOUBLE")
+                            ((and (listp initform)
+                                  (eq (first initform) 'local-time:universal-to-timestamp))
+                             "TIMESTAMP")
                             (t                  "VARCHAR")))))
 
 (defun %slot-values (obj)
@@ -36,6 +39,8 @@
   (cond ((floatp value)  (format nil "~f" value))
         ((numberp value) (format nil "~a" value))
         ((null value)    "NULL")
+        ((typep value 'local-time:timestamp)
+         (format nil "'~a'" (local-time:format-timestring nil value)))
         (t (format nil "'~a'" (cl-ppcre:regex-replace-all "'" (princ-to-string value) "''")))))
 
 (defun %make-insert-sql (table-name obj)
@@ -51,14 +56,23 @@
 (defun save-to-parquet (objects parquet-path &key (table-name "alpha_vantage_data"))
   "Write a list of CLOS objects to a Parquet file via DuckDB.
 Each object's direct slots are mapped to columns. All objects must share the
-same type and slot layout."
+same type and slot layout.  If PARQUET-PATH already exists, existing rows are
+loaded first and the result is deduplicated so repeated downloads do not create
+duplicate records."
   (when (null objects) (return-from save-to-parquet nil))
   (let* ((first-obj (first objects))
          (expected-slot-defs (%slot-definitions first-obj))
-         (expected-type (type-of first-obj)))
+         (expected-type (type-of first-obj))
+         (existing-p (probe-file parquet-path)))
     (duckdb:with-open-database (db)
       (duckdb:with-open-connection (conn db)
         (duckdb:query (%make-create-table-sql table-name first-obj) nil :connection conn)
+        ;; Load existing data first so we can deduplicate
+        (when existing-p
+          (duckdb:query
+           (format nil "INSERT INTO ~a SELECT * FROM read_parquet(~a)"
+                   table-name (%sql-escape parquet-path))
+           nil :connection conn))
         (duckdb:query "BEGIN" nil :connection conn)
         (dolist (obj objects)
           (unless (and (eq (type-of obj) expected-type)
@@ -71,7 +85,7 @@ same type and slot layout."
           (duckdb:query (%make-insert-sql table-name obj) nil :connection conn))
         (duckdb:query "COMMIT" nil :connection conn)
         (duckdb:query
-         (format nil "COPY ~a TO ~a (FORMAT PARQUET)"
+         (format nil "COPY (SELECT DISTINCT * FROM ~a) TO ~a (FORMAT PARQUET)"
                  table-name
                  (%sql-escape parquet-path))
          nil :connection conn)))))
